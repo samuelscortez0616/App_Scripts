@@ -1,5 +1,5 @@
 // Author: Samuel Cortez
-// Last updated: 2018-05-16
+// Last updated: 2018-05-17
 
 /* 
 Current status:
@@ -55,8 +55,13 @@ function filterLoans(sheetId, sheetName, status, condition) {
   var loanIdCol = header[0].indexOf('Loan ID'); loanIdCol += 1;
   var targetCol = header[0].indexOf(status); targetCol += 1;
   
+  // Get the last row of sheet
+  var lastRow = sheet.getLastRow() - 1;
+  // Find loop limit based on total number of blocks
+  var loopLimit = Math.ceil(lastRow/100);
+  
   // Get loan id based on criteria
-  for (var i = 0; i < 9; i++) {
+  for (var i = 0; i < loopLimit; i++) { // I WILL NEED TO USE PROPERTIES
     if (sheet.getRange(i + 2, targetCol).getDisplayValue() === condition) { // Check if criteria is met
      
       // Create key/value pairing and add to object
@@ -76,9 +81,16 @@ function logLoanIds(loanIds, targetSheet) {
   // Open landing doc
   var ss = SpreadsheetApp.getActive();
   var sheet = ss.getSheetByName(targetSheet);
+  var sheetAppended = ss.getSheetByName('Appended');
   
-  // Log loan id to next empty cell
   for (var i in loanIds) {
+    
+    // Log loan id to next empty cell in corresponding tab
     sheet.getRange(sheet.getLastRow() + 1, 1).setValue(i);
+    
+    // Log loan id to next empty cell in appended tab
+    sheetAppended.getRange(sheetAppended.getLastRow() + 1, 1).setValue(i);
+    sheetAppended.getRange(sheetAppended.getLastRow(), 1).offset(0, 1).setValue(loanIds[i]);
   }
+  
 };
