@@ -1,0 +1,84 @@
+// Author: Samuel Cortez
+// Last updated: 2018-05-16
+
+/* 
+Current status:
+Script can open selected sheets and filter out loan ids from given criteria
+Filtered loan ids are logged unto target sheet
+
+Updates needed:
+- Add aggregate of filtered loan ids
+- Have function filterLoans() loop so that it does not time out
+- implement ".filter()" method?
+*/
+
+
+
+
+function getSheets() {
+  
+  // Infomation on True_False
+  var sheetIdBK = '1rDJUwTAHNzkEMdJ_sAR1G6WjpF8siVYbKEbfEM_Mcaw';
+  var sheetBK = 'BK';
+  var statusBK = 'BK Confirmed?';
+  var conditionBK = 'TRUE';
+  
+  
+  // Information on Color
+  var sheetIdColor = '1aYN10sN-qiTm8Zi1sScW3YDbrmsdUED6C76M4tMo6nc';
+  var sheetColor = 'Color';
+  var statusColor = 'Color';
+  var conditionColor = 'Blue';
+  
+  // Filter BK loan ids and log them in BK tab of Landing Doc
+  var loanIdBK = filterLoans(sheetIdBK, sheetBK, statusBK, conditionBK);
+  var landBKLoanIds = logLoanIds(loanIdBK, sheetBK);
+  
+  // Filter Color loan ids and log them in Color tab of Landing Doc
+  var loanIdBlue = filterLoans(sheetIdColor, sheetColor, statusColor, conditionColor);
+  var landColorLoanIds = logLoanIds(loanIdBlue, sheetColor);
+};
+
+
+
+// Open selected sheet and return an object of filtered loan ids matching criteria
+function filterLoans(sheetId, sheetName, status, condition) {
+  // Open sheet
+  var ss = SpreadsheetApp.openById(sheetId);
+  var sheet = ss.getSheetByName(sheetName);
+  
+  // Created an empty object
+  var filteredLoanIds = {};
+  
+  // Get correct headers
+  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+  var loanIdCol = header[0].indexOf('Loan ID'); loanIdCol += 1;
+  var targetCol = header[0].indexOf(status); targetCol += 1;
+  
+  // Get loan id based on criteria
+  for (var i = 0; i < 9; i++) {
+    if (sheet.getRange(i + 2, targetCol).getDisplayValue() === condition) { // Check if criteria is met
+     
+      // Create key/value pairing and add to object
+      filteredLoanIds[sheet.getRange(i + 2, loanIdCol).getValue()] = status;
+    }
+  }
+  
+  // Return filteredLoanIds object
+  return filteredLoanIds;
+};
+
+
+
+// Open landing doc, and drop filtered loan ids
+function logLoanIds(loanIds, targetSheet) {
+  
+  // Open landing doc
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName(targetSheet);
+  
+  // Log loan id to next empty cell
+  for (var i in loanIds) {
+    sheet.getRange(sheet.getLastRow() + 1, 1).setValue(i);
+  }
+};
