@@ -1,149 +1,157 @@
 // Author: Samuel Cortez
 // Last updated: 2018-05-20
 
-/* 
-Current status:
-Script can open selected sheets and filter out loan ids from given criteria
-Filtered loan ids are logged unto target sheet
 
-Updates needed:
-- Add aggregate of filtered loan ids
-- Have function filterLoans() loop so that it does not time out
-- implement ".filter()" method?
-*/
+
+SHEETIDS = ['1rDJUwTAHNzkEMdJ_sAR1G6WjpF8siVYbKEbfEM_Mcaw', '1aYN10sN-qiTm8Zi1sScW3YDbrmsdUED6C76M4tMo6nc'];
+SHEETNAMES = ['BK', 'Color'];
+HEADERS = ['BK Confirmed?', 'Color'];
+CONDITIONS = ['TRUE', 'Blue'];
 
 
 
 // Create a loop counter to track the number of times a trigger is run
 function refreshProperties() {
   
-  // Create a property called "blockCounter"
+  // Create a sheet counter to keep track of sheets reviewed
+  PropertiesService.getUserProperties().setProperty('sheetCounter', '0');
+  
+  // Create block counter to keep track of blocks reviewed in a sheet
   PropertiesService.getUserProperties().setProperty('blockCounter', '0');
+  
+  // Create trigger id to remember unique id of the 1-minute trigger
+  PropertiesService.getUserProperties().setProperty('triggerId', '');
 }
 
 
 
-
-// Enter 1-min trigger function()
-
-
-
-function getSheets() {
+// Check if it is OK to review sheets
+function checkSheets() {
+  var currentDay = new Date();
   
-  refreshProperties();
-  
-  // Infomation on True_False
-  var sheetIdBK = '1rDJUwTAHNzkEMdJ_sAR1G6WjpF8siVYbKEbfEM_Mcaw';
-  var sheetBK = 'BK';
-  var statusBK = 'BK Confirmed?';
-  var conditionBK = 'TRUE';
-  
-  
-  // Information on Color
-  var sheetIdColor = '1aYN10sN-qiTm8Zi1sScW3YDbrmsdUED6C76M4tMo6nc';
-  var sheetColor = 'Color';
-  var statusColor = 'Color';
-  var conditionColor = 'Blue';
-  
-  // Filter BK loan ids and log them in BK tab of Landing Doc
-  var loanIdBK = filterLoans(sheetIdBK, sheetBK, statusBK, conditionBK);
-  var landBKLoanIds = logLoanIds(loanIdBK, sheetBK);
-  
-  // Filter Color loan ids and log them in Color tab of Landing Doc
-  var loanIdBlue = filterLoans(sheetIdColor, sheetColor, statusColor, conditionColor);
-  var landColorLoanIds = logLoanIds(loanIdBlue, sheetColor);
+  if (currentDay.getDay() >= 0 || currentDay.getDay() <= 5) {
+    
+    // Get current counter number
+    var counter = Number(PropertiesService.getUserProperties().getProperty('sheetCounter'));
+    var counterLimit = SHEETIDS.length;
+    
+    // Check current number of sheets reviewed
+    if (counter < counterLimit) {
+      
+      // Create a 1-minute trigger if not all sheets have been reviewed
+      createTrigger();
+    } else {
+      
+      // Reset sheet counter to '0' if all sheets have been reviewed
+      PropertiesService.getUserProperties().setProperty('sheetCounter', '0');
+    }
+  }
 };
 
 
 
-// Delete all triggers
-function deleteTriggers() {
+// Create a 1-minute trigger
+function createTrigger() {
+  var trigger = ScriptApp.newTrigger('filterLoans')
+  .timeBased()
+  .everyMinutes(1)
+  .create();
   
-  // Retrieve active triggers in this script
-  var allTriggers = ScriptApp.getProjectTriggers();
-  
-  for (var i = 0; i < allTriggers.length; i++) {
-    ScriptApp.deleteTrigger(allTriggers[i]);
-  } 
-}
+  // Get id of the 1-minute trigger created
+  var id = trigger.getUniqueId();
+  PropertiesService.getUserProperties().setProperty('triggerId', id);
+};
 
 
 
 // Open selected sheet and return an object of filtered loan ids matching criteria
-function filterLoans(sheetId, sheetName, status, condition) {
+function filterLoans() {
+  
+  // Retrieve block and sheet counters
+  var index = Number(PropertiesService.getUserProperties().getProperty('sheetCounter'));
+  var counter = Number(PropertiesService.getUserProperties().getProperty('blockCounter'));
+  
+  // Get relevant sheet information to open and review sheet
+  var sheetId = SHEETIDS[index], sheetName = SHEETNAMES[index], colHeader = HEADERS[index], condition = CONDITIONS[index];
+  
   // Open sheet
   var ss = SpreadsheetApp.openById(sheetId);
   var sheet = ss.getSheetByName(sheetName);
   
   // Created an empty object
-  var filteredLoanIds = {}; // new Object();?
+  var filteredLoanIds = []; // new Object();?
   
   // Get correct headers
   var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
   var loanIdCol = header[0].indexOf('Loan ID'); loanIdCol += 1;
-  var targetCol = header[0].indexOf(status); targetCol += 1;
+  var conditionCol = header[0].indexOf(colHeader); conditionCol += 1;
   
-  // Find loop limit based on total number of blocks
-  var lastRow = sheet.getLastRow() - 1;
-  var loopLimit = Math.ceil(lastRow/50) - 1;
-  Logger.log('loopLimit: ' + loopLimit);
+  var startOfBlock = (counter * 50) + 2;
   
-  // loop through loopLimit
-  for (var i = 0; i <= loopLimit; i++) {
-    Logger.log('current loop: ' + i);
+  // Count how many blocks exist in the sheet
+  var totalBlocks = Math.ceil((sheet.getLastRow() - 1)/50); totalBlocks = totalBlocks - 1;
+  
+  try {
     
-    // Set integer value for beginning row
-    var startOfBlock = (i * 50) + 2;
-    Logger.log('startOfBlock: ' + startOfBlock);
-    
-    // Check if trigger has ran over the loop limit
-    if ( i < loopLimit) {
+    // Check which block number will be reviewed
+    if (counter < totalBlocks) {
       
-      // Set integetr value for ending row
-      var endOfBlock = (i + 1) * 50 + 1;
-      Logger.log('endOfBlock: ' + endOfBlock);
+      var endOfBlock = (counter + 1) * 50 + 1;
       
+      // Create arrays for loan column and condition column
       var allLoanIds = sheet.getRange(startOfBlock, loanIdCol, endOfBlock).getValues();
-      var allStatuses = sheet.getRange(startOfBlock, targetCol, endOfBlock).getDisplayValues();
-      Logger.log('length of status: ' + allStatuses.length);
+      var allValues = sheet.getRange(startOfBlock, conditionCol, endOfBlock).getDisplayValues();
       
-      for (var x = 0; x < allStatuses.length; x++)  {
-        
-        if (allStatuses[x][0] === condition) {
-          
-          filteredLoanIds[allLoanIds[x]] = status;
+      // Loop through the values in the allValues array
+      for (var i = 0; i < allValues.length; i++) {
+        if (allValues[i][0] === condition) {
+          var filterLoan = {
+            loanId : allLoanIds[i],
+            status : colHeader
+          };
+          filteredLoanIds.push(filterLoan);
         }
       }
-      allLoanIds = [];
-      allStatuses = [];
+      
+      // Add 1 to block Counter
+      counter += 1;
+      PropertiesService.getUserProperties().setProperty('blockCounter', counter);
+      
+      logLoanIds(filteredLoanIds, SHEETNAMES[counter]);
     } else {
+      var endOfBlock = sheet.getLastRow() - startOfBlock; endOfBlock = endOfBlock + 1;
       
-      Logger.log('"i" is greater than the loop limit');
-      var endOfBlock = sheet.getLastRow() - startOfBlock + 1;
-      Logger.log('Next direction: ' + endOfBlock);
-      
-      // Assuming the loan id, and condition column have the same rows
       var allLoanIds = sheet.getRange(startOfBlock, loanIdCol, endOfBlock).getValues();
-      var allStatuses = sheet.getRange(startOfBlock, targetCol, endOfBlock).getDisplayValues();
-      Logger.log('length of status: ' + allStatuses.length);
+      var allValues = sheet.getRange(startOfBlock, conditionCol, endOfBlock).getDisplayValues();
       
-      for (var x = 0; x < allStatuses.length; x++)  {
-        
-        if (allStatuses[x][0] === condition) {
-          
-          filteredLoanIds[allLoanIds[x]] = status;
-        }    
-        // End trigger
-        deleteTriggers();
+      // Loop through values under the condition column
+      for (var i = 0; i < allValues.length; i++) {
+        if (allValues[i][0] === condition) {
+          var filterLoan = {
+            loanId : allLoanIds[i],
+            status : colHeader
+          };
+          filteredLoanIds.push(filterLoan);
+        }
       }
-      allLoanIds = [];
-      allStatuses = [];
-    } 
-  } 
-  
-  Logger.log('filtered loans: ' + filteredLoanIds.keys().length);
-  // Return filteredLoanIds object
-  return filteredLoanIds;
+      
+      // Delete the 1 minute trigger
+      deleteTriggers();
+      
+      logLoanIds(filteredLoanIds, SHEETNAMES[counter]);
+      
+      // Reset the block counter
+      PropertiesService.getUserProperties().setProperty('blockCounter', '0');
+      
+      // Add 1 to sheet counter
+      index += 1;
+      PropertiesService.getUserProperties().setProperty('sheetCounter', index);
+      
+      getSheet();
+    }
+  } catch(e) {
+    logErrors('filterLoans', e);
+  }
 };
 
 
@@ -156,14 +164,47 @@ function logLoanIds(loanIds, targetSheet) {
   var sheet = ss.getSheetByName(targetSheet);
   var sheetAppended = ss.getSheetByName('Appended');
   
-  for (var i in loanIds) {
+  for (var i = 0; i < loanIds.length; i++) {
     
     // Log loan id to next empty cell in corresponding tab
-    sheet.getRange(sheet.getLastRow() + 1, 1).setValue(i);
+    sheet.getRange(sheet.getLastRow() + 1, 1).setValue(loanIds[i]['loanId']);
     
     // Log loan id to next empty cell in appended tab
-    sheetAppended.getRange(sheetAppended.getLastRow() + 1, 1).setValue(i);
-    sheetAppended.getRange(sheetAppended.getLastRow(), 1).offset(0, 1).setValue(loanIds[i]);
+    sheetAppended.getRange(sheetAppended.getLastRow() + 1, 1).setValue(loanIds[i]['loanId']);
+    sheetAppended.getRange(sheetAppended.getLastRow(), 1).offset(0, 1).setValue(loanIds[i]['status']);
   }
+};
+
+
+
+// Delete all triggers
+function deleteTriggers() {
   
+  // Retrieve active triggers in this script
+  var allTriggers = ScriptApp.getProjectTriggers();
+  
+  var targetId = PropertiesService.getUserProperties().getProperty('triggerId');
+  
+  // Find the 1-minute trigger and delete it
+  try {
+    allTriggers.forEach(function(element, index) {
+      if (element.getUniqueId() === targetId) {
+        ScriptApp.deleteTrigger(element);
+      }
+    });
+  } catch(e) {
+    logErrors('deleteTriggers', e);
+  }
+};
+
+
+
+// Log errors
+function logErrors(functionName, e) {
+  var time = new Date();
+  
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName('Error_log');
+  
+  sheet.getRange(sheet.getLastRow(), 1).setValue('Error at function ' + functionName + 'on ' + time + ': ' + e);
 };
