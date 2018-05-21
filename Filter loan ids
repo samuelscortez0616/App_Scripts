@@ -1,6 +1,7 @@
-// Author: Samuel Cortez
-// Last updated: 2018-05-20
-
+/*
+Author: Samuel Cortez
+Last updated: 2018-05-20
+*/
 
 
 SHEETIDS = ['1rDJUwTAHNzkEMdJ_sAR1G6WjpF8siVYbKEbfEM_Mcaw', '1aYN10sN-qiTm8Zi1sScW3YDbrmsdUED6C76M4tMo6nc'];
@@ -21,7 +22,7 @@ function refreshProperties() {
   
   // Create trigger id to remember unique id of the 1-minute trigger
   PropertiesService.getUserProperties().setProperty('triggerId', '');
-}
+};
 
 
 
@@ -44,6 +45,7 @@ function checkSheets() {
       
       // Reset sheet counter to '0' if all sheets have been reviewed
       PropertiesService.getUserProperties().setProperty('sheetCounter', '0');
+      Logger.log('sheetCounter is now 0');
     }
   }
 };
@@ -60,6 +62,8 @@ function createTrigger() {
   // Get id of the 1-minute trigger created
   var id = trigger.getUniqueId();
   PropertiesService.getUserProperties().setProperty('triggerId', id);
+  
+  Logger.log('new trigger id: ' + PropertiesService.getUserProperties().getProperty('triggerId'));
 };
 
 
@@ -117,7 +121,7 @@ function filterLoans() {
       counter += 1;
       PropertiesService.getUserProperties().setProperty('blockCounter', counter);
       
-      logLoanIds(filteredLoanIds, SHEETNAMES[counter]);
+      logLoanIds(filteredLoanIds, sheetName);
     } else {
       var endOfBlock = sheet.getLastRow() - startOfBlock; endOfBlock = endOfBlock + 1;
       
@@ -138,16 +142,17 @@ function filterLoans() {
       // Delete the 1 minute trigger
       deleteTriggers();
       
-      logLoanIds(filteredLoanIds, SHEETNAMES[counter]);
+      logLoanIds(filteredLoanIds, sheetName);
       
       // Reset the block counter
-      PropertiesService.getUserProperties().setProperty('blockCounter', '0');
+      var blockCounter = PropertiesService.getUserProperties().setProperty('blockCounter', '0');
+      Logger.log('blockCounter is now 0.');
       
       // Add 1 to sheet counter
       index += 1;
-      PropertiesService.getUserProperties().setProperty('sheetCounter', index);
+      var sheetCounter = PropertiesService.getUserProperties().setProperty('sheetCounter', index);
       
-      getSheet();
+      checkSheets();
     }
   } catch(e) {
     logErrors('filterLoans', e);
@@ -167,7 +172,7 @@ function logLoanIds(loanIds, targetSheet) {
   for (var i = 0; i < loanIds.length; i++) {
     
     // Log loan id to next empty cell in corresponding tab
-    sheet.getRange(sheet.getLastRow() + 1, 1).setValue(loanIds[i]['loanId']);
+    sheet.getRange(sheet.getLastRow(), 1).offset(1, 0).setValue(loanIds[i]['loanId']);
     
     // Log loan id to next empty cell in appended tab
     sheetAppended.getRange(sheetAppended.getLastRow() + 1, 1).setValue(loanIds[i]['loanId']);
@@ -190,6 +195,7 @@ function deleteTriggers() {
     allTriggers.forEach(function(element, index) {
       if (element.getUniqueId() === targetId) {
         ScriptApp.deleteTrigger(element);
+        Logger.log('Deleted triger.');
       }
     });
   } catch(e) {
@@ -206,5 +212,5 @@ function logErrors(functionName, e) {
   var ss = SpreadsheetApp.getActive();
   var sheet = ss.getSheetByName('Error_log');
   
-  sheet.getRange(sheet.getLastRow(), 1).setValue('Error at function ' + functionName + 'on ' + time + ': ' + e);
+  sheet.getRange(sheet.getLastRow(), 1).offset(1, 0).setValue('Error at function ' + functionName +  ' on ' + time + ': ' + e);
 };
